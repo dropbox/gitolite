@@ -1,0 +1,47 @@
+#!/usr/bin/env python
+"""
+The inverse of VREF/NAME_NC -- matches when files *not* matching the provided
+path are touched.
+
+This adds the special twist that __USERNAME__ in the path is replaced with the
+username of the user pushing. The intended use case is to deny users write
+access outside of their own personal subdirectories.
+
+NOTE: I advise keeping it simple and not using regexes with this, because
+ 1) this does plain string prefix matching when looking at files modified
+ 2) when a file not matching the provided path is found, we emit the passed-in
+    refex, and it's likely that your regex won't match itself. (E.g. if you
+    made a rule "VREF/NOT_NAME_NC/foo$" to try to manage writes to files other
+    than foo, this will print the string "VREF/NOT_NAME_NC/foo$", which doesn't
+    match that pattern! And then gitolite won't ever apply your rule.)
+"""
+
+from __future__ import print_function
+
+import os
+import subprocess
+import sys
+
+
+def get_touched_paths(newsha):
+    cmd = ["git", "log", "--name-only", "--pretty=format:", "-z", newsha, "--not", "--all"]
+    paths = subprocess.check_output(cmd).split('\0')[:-1]
+    paths_set = set(paths)
+    if '' in paths_set:
+        paths_set.remove('')
+    return sorted(paths_set)
+
+
+if __name__ == "__main__":
+    newsha = sys.argv[3]
+    refex = sys.argv[7]
+
+    # strip off initial "VREF/<vref-name>/"
+    rule_path = refex.split('/', 2)[2]
+    rule_path = rule_path.replace("__USERNAME__", os.environ['GL_USER'])
+
+    for touched_path in get_touched_paths(newsha):
+        if not touched_path.startswith(rule_path):
+            print("{r} did not match {r}".format(touched_path, rule_path), file=sys.stderr)
+            print(refex)
+            sys.exit(0)
