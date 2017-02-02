@@ -42,6 +42,6 @@ if __name__ == "__main__":
 
     for touched_path in get_touched_paths(newsha):
         if not touched_path.startswith(rule_path):
-            print("{r} did not match {r}".format(touched_path, rule_path), file=sys.stderr)
+            print("{!r} did not match {!r}".format(touched_path, rule_path), file=sys.stderr)
             print(refex)
             sys.exit(0)
